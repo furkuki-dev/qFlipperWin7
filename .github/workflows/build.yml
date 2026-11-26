@@ -16,13 +16,18 @@ jobs:
           submodules: true
           fetch-depth: 0   # needed for git describe (version in NSIS and qmake)
 
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Install Qt 5.15.2 (MSVC 2019, 32-bit)
         uses: jurplel/install-qt-action@v4
         with:
           version: '5.15.2'
           arch: 'win32_msvc2019'
           dir: 'C:\Qt'          # build_windows.bat expects C:\Qt\5.15.2\msvc2019
-          modules: 'qtserialport'
+          modules: 'qtdeclarative qtquickcontrols qtquickcontrols2 qtsvg qtserialport'
           cache: true
 
       - name: Install Visual Studio 2019 Build Tools (x86 toolchain)
