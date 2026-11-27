@@ -17,6 +17,34 @@ Q_LOGGING_CATEGORY(CATEGORY_SELFUPDATES, "SFU")
 using namespace Flipper;
 using namespace Updates;
 
+namespace {
+
+// Installer key on the update server for the running build (type and target)
+struct PackageKey {
+    QString type;
+    QString target;
+};
+
+PackageKey currentPackageKey()
+{
+#if defined(Q_OS_WINDOWS)
+#if defined(_WIN64)
+    return {QStringLiteral("installer"), QStringLiteral("windows/amd64")};
+#else
+    // 32-bit (x86) Windows build. The server must publish its installer under this key.
+    return {QStringLiteral("installer"), QStringLiteral("windows/386")};
+#endif
+#elif defined(Q_OS_MAC)
+    return {QStringLiteral("dmg"), QStringLiteral("macos/amd64")};
+#elif defined(Q_OS_LINUX)
+    return {QStringLiteral("AppImage"), QStringLiteral("linux/amd64")};
+#else
+#error "Unsupported OS"
+#endif
+}
+
+} // namespace
+
 ApplicationUpdater::ApplicationUpdater(QObject *parent):
     QObject(parent),
     m_state(Idle),
@@ -46,7 +74,13 @@ bool ApplicationUpdater::canUpdate(const Flipper::Updates::VersionInfo &versionI
     const auto appVersion = QStringLiteral(APP_VERSION);
     const auto appCommit = QStringLiteral(APP_COMMIT);
 
+    const auto key = currentPackageKey();
+
     if(!globalPrefs->checkApplicationUpdates()) {
+        return false;
+    } else if(versionInfo.fileInfo(key.type, key.target).url().isEmpty()) {
+        // The server has no installer for this build (for example the 32-bit Windows build),
+        // so there is nothing to install and the update must not be offered
         return false;
     } else if(versionInfo.date() > appDate) {
         return true;
@@ -63,21 +97,16 @@ bool ApplicationUpdater::canUpdate(const Flipper::Updates::VersionInfo &versionI
 
 void ApplicationUpdater::installUpdate(const Flipper::Updates::VersionInfo &versionInfo)
 {
-#if defined(Q_OS_WINDOWS)
-    // 32-bit (x86) Windows build: the installer is published under the "386" platform key.
-    // Use "windows/amd64" again if this file is built for 64-bit Windows.
-#if defined(_WIN64)
-    const auto fileInfo = versionInfo.fileInfo(QStringLiteral("installer"), QStringLiteral("windows/amd64"));
-#else
-    const auto fileInfo = versionInfo.fileInfo(QStringLiteral("installer"), QStringLiteral("windows/386"));
-#endif
-#elif defined(Q_OS_MAC)
-    const auto fileInfo = versionInfo.fileInfo(QStringLiteral("dmg"), QStringLiteral("macos/amd64"));
-#elif defined(Q_OS_LINUX)
-    const auto fileInfo = versionInfo.fileInfo(QStringLiteral("AppImage"), QStringLiteral("linux/amd64"));
-#else
-#error "Unsupported OS"
-#endif
+    const auto key = currentPackageKey();
+    const auto fileInfo = versionInfo.fileInfo(key.type, key.target);
+
+    if(fileInfo.url().isEmpty()) {
+        // An empty URL means the server has no package for this platform.
+        // Without this check the downloader fails with "Protocol unknown" and an empty address.
+        qCWarning(CATEGORY_SELFUPDATES).noquote() << "No update package on the server for this build:" << key.type << key.target;
+        setState(ErrorOccured);
+        return;
+    }
 
     const auto fileName = QFileInfo(fileInfo.url()).fileName();
 
