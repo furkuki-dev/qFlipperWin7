@@ -56,6 +56,15 @@
   !delfile "${StdOut}"
   !undef StdOut
 
+  ; Fallback when git has no tags (or the tag is not plain X.X.X): VIProductVersion needs exactly X.X.X.X
+  !ifndef VERSION
+    !define VERSION "0.0.0"
+  !endif
+  !if "${VERSION}" == ""
+    !undef VERSION
+    !define VERSION "0.0.0"
+  !endif
+
   ; Default installation Dir. 64-bit build: C:\Program Files\qFlipper, 32-bit build: C:\Program Files (x86)\qFlipper
   !if ${ARCH_BITS} == 64
     InstallDir "$PROGRAMFILES64\${NAME}"
@@ -133,7 +142,7 @@ Section "-Main Application"
 
 	RMDir /r $INSTDIR
 
-    ; Use 64bit registry keys, not WOW6432Node
+    ; Use registry view matching the build architecture
     SetRegView ${ARCH_BITS} 
 
     ; Sets the context of shell folders to "All Users"
@@ -203,7 +212,7 @@ SectionEnd
 
 Section "-Cleanup"
 
-    ; Use 64bit registry keys, not WOW6432Node
+    ; Use registry view matching the build architecture
     SetRegView ${ARCH_BITS} 
 
 	Delete ${VCREDIST2019_EXE}
@@ -227,7 +236,7 @@ SectionEnd
 
 Section "un.Uninstall qFlipper" UninstallqFlipperSection
 
-  ; Use 64bit registry keys, not WOW6432Node
+  ; Use registry view matching the build architecture
   SetRegView ${ARCH_BITS} 
 
   ; Kills running qFlipper.exe processes
@@ -364,4 +373,3 @@ FunctionEnd
       SetBrandingImage /IMGID=1046 "$PLUGINSDIR\windows_installer_header$0.bmp"
     ${EndIf}
   FunctionEnd 
-
