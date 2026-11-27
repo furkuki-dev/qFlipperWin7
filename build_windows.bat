@@ -47,7 +47,6 @@ set DIST_DIR=%BUILD_DIR%\%TARGET%
 set PLUGINS_DIR=%DIST_DIR%\plugins
 set DRIVER_TOOL_DIR=%PROJECT_DIR%\driver-tool
 
-rem Qt ships OpenSSL as Win_x86 for 32-bit and Win_x64 for 64-bit (not Win_x32)
 set OPENSSL_ARCH=x86
 if %ARCH_BITS%==64 set OPENSSL_ARCH=x64
 set OPENSSL_DIR=%QT_DIR%\Tools\OpenSSL\Win_%OPENSSL_ARCH%\bin
@@ -79,8 +78,14 @@ cd %DIST_DIR%
 rem Copy OpenSSL binaries
 copy /Y %OPENSSL_DIR%\*.dll .
 
-rem Copy the driver
+rem Copy the STM32 DFU driver
 xcopy /Y /E /I %STM32_DRIVER_DIR% %DIST_DIR%\"STM32 Driver"
+
+rem Copy extra driver packages from the repo "drivers" folder.
+rem Every .inf found there is installed by the NSIS installer ("Bundled drivers" section).
+if exist "%PROJECT_DIR%\drivers" (
+    xcopy /Y /E /I "%PROJECT_DIR%\drivers" "%DIST_DIR%\Drivers" || goto error
+)
 
 rem Copy Microsoft Visual C++ redistributable packages
 copy /Y %VCREDIST2019_EXE% .
