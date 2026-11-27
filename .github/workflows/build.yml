@@ -26,8 +26,29 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install "aqtinstall==3.1.*"
-          python -m aqt install-qt --outputdir C:\Qt windows desktop 5.15.2 win32_msvc2019 `
-            -m qtdeclarative qtquickcontrols qtquickcontrols2 qtsvg qtserialport
+
+          # Ask aqt which modules it actually offers for this kit and print them to the log
+          $listOutput = & python -m aqt list-qt windows desktop --modules 5.15.2 win32_msvc2019 2>&1 |
+            ForEach-Object { "$_" }
+          Write-Host "=== Modules offered by aqt for 5.15.2 win32_msvc2019 ==="
+          $listOutput | ForEach-Object { Write-Host $_ }
+
+          # Module names that qFlipper needs (qtquickcontrols2 is the qmake name for quickcontrols2)
+          $wanted = @('qtdeclarative', 'qtquickcontrols2', 'qtsvg', 'qtserialport')
+          $offered = @($listOutput | ForEach-Object { $_ -split '\s+' } | Where-Object { $_ -match '^qt[a-z0-9]+$' })
+          $modules = @($wanted | Where-Object { $offered -contains $_ })
+          $missing = @($wanted | Where-Object { $offered -notcontains $_ })
+
+          Write-Host "Installing modules: $($modules -join ', ')"
+          if ($missing.Count -gt 0) {
+            Write-Host "::warning::Not found in aqt module list: $($missing -join ', ')"
+          }
+
+          $installArgs = @('install-qt', '--outputdir', 'C:\Qt', 'windows', 'desktop', '5.15.2', 'win32_msvc2019')
+          if ($modules.Count -gt 0) { $installArgs += @('-m') + $modules }
+          & python -m aqt @installArgs
+          if ($LASTEXITCODE -ne 0) { throw "aqt install-qt failed with exit code $LASTEXITCODE" }
+
           if (-not (Test-Path 'C:\Qt\5.15.2\msvc2019\bin\qmake.exe')) {
             throw 'qmake.exe not found after aqt install'
           }
