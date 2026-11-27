@@ -115,6 +115,20 @@ jobs:
           if (-not $inf) { throw 'STM32Bootloader.inf not found in archive' }
           Copy-Item (Split-Path $inf.FullName) -Destination 'C:\STM32 Driver' -Recurse -Force
 
+      - name: Fetch nanopb sources
+        shell: pwsh
+        run: |
+          if (-not (Test-Path '3rdparty\nanopb\pb_common.c')) {
+            git clone --depth 1 --branch 0.4.9.1 https://github.com/nanopb/nanopb.git "$env:RUNNER_TEMP\nanopb"
+            if ($LASTEXITCODE -ne 0) { throw 'git clone of nanopb failed' }
+            New-Item -ItemType Directory -Force -Path '3rdparty\nanopb' | Out-Null
+            Copy-Item "$env:RUNNER_TEMP\nanopb\*.c" '3rdparty\nanopb\' -Force
+            Copy-Item "$env:RUNNER_TEMP\nanopb\pb*.h" '3rdparty\nanopb\' -Force
+          }
+          foreach ($f in 'pb_common.c','pb_decode.c','pb_encode.c') {
+            if (-not (Test-Path "3rdparty\nanopb\$f")) { throw "nanopb file missing: $f" }
+          }
+
       - name: Build qFlipper (x86)
         shell: cmd
         run: build_windows.bat
