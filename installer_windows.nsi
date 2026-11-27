@@ -19,18 +19,23 @@
   !define /ifndef NAME "qFlipper"
   !define /ifndef COMPANY "Flipper Devices Inc."
   !define /ifndef ARCH_BITS 64
-  !define UNINSTALL_EXE "$INSTDIR\uninstall.exe"
-  !define VCREDIST2019_EXE "$INSTDIR\vcredist_msvc2019_x${ARCH_BITS}.exe"
-  !define VCREDIST2010_EXE "$INSTDIR\vcredist_x${ARCH_BITS}.exe"
-  !define UNINSTALL_REG_PATH "Software\Microsoft\Windows\CurrentVersion\Uninstall\${NAME}"
+
+  ; VC++ redistributable file names: same names as build_windows.bat and the CI download
   !if ${ARCH_BITS} == 64
+    !define VC_ARCH "x64"
     !define VC2010_REG_PATH "SOFTWARE\WOW6432Node\Microsoft\VisualStudio\10.0\VC\VCRedist\x64"
     !define VC2019_REG_PATH "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
   !else
+    !define VC_ARCH "x86"
     ; 32-bit registry view maps these to WOW6432Node automatically on x64 Windows
     !define VC2010_REG_PATH "SOFTWARE\Microsoft\VisualStudio\10.0\VC\VCRedist\x86"
     !define VC2019_REG_PATH "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x86"
   !endif
+  !define VCREDIST2019_EXE "$INSTDIR\vcredist_msvc2019_${VC_ARCH}.exe"
+  !define VCREDIST2010_EXE "$INSTDIR\vcredist_${VC_ARCH}.exe"
+
+  !define UNINSTALL_EXE "$INSTDIR\uninstall.exe"
+  !define UNINSTALL_REG_PATH "Software\Microsoft\Windows\CurrentVersion\Uninstall\${NAME}"
   !define STM32_DRIVER_PATH "$INSTDIR\STM32 Driver"
   !define BUNDLED_DRIVERS_PATH "$INSTDIR\Drivers"
 
@@ -49,20 +54,9 @@
   Name ${NAME}
   OutFile "build\${NAME}Setup-${ARCH_BITS}bit.exe"
 
-  ; Get version tag from git. Will be used in titles
-  !tempfile StdOut
-  !echo "${StdOut}"
-  !system '"git" describe --tags --abbrev=0 --exclude "*-rc*" > "${StdOut}"'
-  !define /file VERSION "${StdOut}"
-  !delfile "${StdOut}"
-  !undef StdOut
-
-  ; Fallback when git has no tags (or the tag is not plain X.X.X): VIProductVersion needs exactly X.X.X.X
+  ; Version is passed by build_windows.bat as /DVERSION=X.X.X (from the git tag).
+  ; Falls back to 0.0.0 when it is not passed, so VIProductVersion always gets X.X.X.X
   !ifndef VERSION
-    !define VERSION "0.0.0"
-  !endif
-  !if "${VERSION}" == ""
-    !undef VERSION
     !define VERSION "0.0.0"
   !endif
 
@@ -81,8 +75,10 @@
   ; Enable scaling for high DPI screen
   ManifestDPIAware true
 
-  ; Sign the Uninstaller.exe file
-  !uninstfinalize 'flipper_code_sign.bat "%1" wow64shit'
+  ; Sign the Uninstaller.exe file (only if the signing script exists in the repo)
+  !if /FileExists "flipper_code_sign.bat"
+    !uninstfinalize 'flipper_code_sign.bat "%1" wow64shit'
+  !endif
 
   ; Version Information displayer in Properties -> Details tab
   ; Required for antivirus databases
@@ -157,7 +153,7 @@ Section "-Main Application"
 
 	SetOutPath $INSTDIR
 
-    ; Extract files (includes "STM32 Driver" and "Drivers" folders from the build)
+    ; Extract files (includes "STM32 Driver", "Drivers" and the VC++ redistributables from the build)
     SetOverwrite on
     File /r "build\${NAME}\*"
 
@@ -240,7 +236,6 @@ Section "-Cleanup"
 
 	Delete ${VCREDIST2019_EXE}
 	Delete ${VCREDIST2010_EXE}
-	;RMDir /r "${STM32_DRIVER_PATH}"
 
 	${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
 	IntFmt $0 "0x%08X" $0
