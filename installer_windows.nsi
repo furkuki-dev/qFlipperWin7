@@ -32,6 +32,7 @@
     !define VC2019_REG_PATH "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x86"
   !endif
   !define STM32_DRIVER_PATH "$INSTDIR\STM32 Driver"
+  !define BUNDLED_DRIVERS_PATH "$INSTDIR\Drivers"
 
   ; Include File Functions Header
   !include "FileFunc.nsh"
@@ -66,6 +67,7 @@
   !endif
 
   ; Default installation Dir. 64-bit build: C:\Program Files\qFlipper, 32-bit build: C:\Program Files (x86)\qFlipper
+  ; Note: on 32-bit Windows $PROGRAMFILES32 is C:\Program Files
   !if ${ARCH_BITS} == 64
     InstallDir "$PROGRAMFILES64\${NAME}"
   !else
@@ -155,10 +157,9 @@ Section "-Main Application"
 
 	SetOutPath $INSTDIR
 
-    ; Extract files
+    ; Extract files (includes "STM32 Driver" and "Drivers" folders from the build)
     SetOverwrite on
     File /r "build\${NAME}\*"
-    
 
     ; Check if VC2010 installed and install it if not
     ReadRegStr $0 HKLM "${VC2010_REG_PATH}" "Version"
@@ -200,6 +201,28 @@ Section "USB DFU Driver" UsbDriverSection
 		; Windows 7 pnputil syntax
 		nsExec::ExecToLog '"$SYSDIR\pnputil.exe" -i -a "${STM32_DRIVER_PATH}\STM32Bootloader.inf"'
 	${EndIf}
+SectionEnd
+
+; Installs every .inf package found in the "Drivers" folder (filled from the repo "drivers" folder at build time)
+Section "Bundled drivers" BundledDriversSection
+  DetailPrint "Installing bundled driver packages..."
+  ${DisableX64FSRedirection}
+  FindFirst $0 $1 "${BUNDLED_DRIVERS_PATH}\*.inf"
+  StrCmp $0 "" bundled_done
+bundled_loop:
+  DetailPrint "Installing driver package: $1"
+  ${If} ${AtLeastWin8}
+    nsExec::ExecToLog '"$SYSDIR\pnputil.exe" /add-driver "${BUNDLED_DRIVERS_PATH}\$1" /install'
+  ${Else}
+    ; Windows 7 pnputil syntax
+    nsExec::ExecToLog '"$SYSDIR\pnputil.exe" -i -a "${BUNDLED_DRIVERS_PATH}\$1"'
+  ${EndIf}
+  FindNext $0 $1
+  StrCmp $1 "" bundled_close
+  Goto bundled_loop
+bundled_close:
+  FindClose $0
+bundled_done:
 SectionEnd
 
 Section "Start menu entry" StartMenuSection
@@ -259,6 +282,7 @@ SectionEnd
    
   ;Language strings
   LangString DESC_UsbDriverSection ${LANG_ENGLISH} "STM32 Bootloader Driver for Flipper DFU mode"
+  LangString DESC_BundledDriversSection ${LANG_ENGLISH} "Additional driver packages bundled with qFlipper"
   LangString DESC_StartMenuSection ${LANG_ENGLISH} "Add qFlipper to Windows Start menu"
   LangString DESC_DesktopShortcutSection ${LANG_ENGLISH} "Create qFlipper shortcut on Desktop"
   LangString DESC_RemoveDriversSection ${LANG_ENGLISH} "Remove all STM32 USB drivers from the system"
@@ -266,6 +290,7 @@ SectionEnd
   ;Assign language strings to install sections
   !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
     !insertmacro MUI_DESCRIPTION_TEXT ${UsbDriverSection} $(DESC_UsbDriverSection)
+    !insertmacro MUI_DESCRIPTION_TEXT ${BundledDriversSection} $(DESC_BundledDriversSection)
     !insertmacro MUI_DESCRIPTION_TEXT ${StartMenuSection} $(DESC_StartMenuSection)
     !insertmacro MUI_DESCRIPTION_TEXT ${DesktopShortcutSection} $(DESC_DesktopShortcutSection)
   !insertmacro MUI_FUNCTION_DESCRIPTION_END
