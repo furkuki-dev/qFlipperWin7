@@ -109,7 +109,7 @@ void DeviceRegistry::removeDevice(const USBDeviceInfo &info)
             emit deviceCountChanged();
             emit currentDeviceChanged();
 
-                } else {
+        } else {
             qCDebug(LOG_DEVREG).noquote().nospace()
                 << "Device went offline: VID_0x" << QString::number(info.vendorID(), 16) << ":PID_0x" << QString::number(info.productID(), 16);
 
@@ -118,7 +118,8 @@ void DeviceRegistry::removeDevice(const USBDeviceInfo &info)
             device->rpc()->stopSession();
             device->deviceState()->setOnline(false);
         }
-
+    }
+}
 
 void DeviceRegistry::removeOfflineDevices()
 {
