@@ -17,7 +17,14 @@ AbstractTopLevelHelper::AbstractTopLevelHelper(UpdateRegistry *updateRegistry, F
     m_device->deviceState()->setPersistent(true);
 
     connect(m_device, &FlipperZero::operationFinished, this, &AbstractTopLevelHelper::finish);
+
+    // Release the persistent flag when the helper is done. Otherwise the device stays persistent forever,
+    // and after an unplug its RPC session (and its open COM port) is kept alive instead of being closed.
+    connect(this, &AbstractOperationHelper::finished, this, [device]() {
+        device->deviceState()->setPersistent(false);
+    });
 }
+
 
 UpdateRegistry *AbstractTopLevelHelper::updateRegistry()
 {
