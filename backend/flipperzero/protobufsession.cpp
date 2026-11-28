@@ -82,8 +82,15 @@ bool ProtobufSession::isSessionUp() const
 
 void ProtobufSession::setSerialPort(const QSerialPortInfo &portInfo)
 {
+    // Release the previous session first: startSession() ignores a running session,
+    // so the new port would never be opened. isSessionUp() also guarantees a valid m_serialPort.
+    if(isSessionUp()) {
+        doStopSession();
+    }
+
     m_portInfo = portInfo;
 }
+
 
 void ProtobufSession::setMajorVersion(int versionMajor)
 {
