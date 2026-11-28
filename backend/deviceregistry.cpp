@@ -7,6 +7,7 @@
 #include "flipperzero/helper/deviceinfohelper.h"
 #include "flipperzero/flipperzero.h"
 #include "flipperzero/devicestate.h"
+#include "flipperzero/protobufsession.h"
 
 #include "usbdevice.h"
 
@@ -108,14 +109,16 @@ void DeviceRegistry::removeDevice(const USBDeviceInfo &info)
             emit deviceCountChanged();
             emit currentDeviceChanged();
 
-        } else {
+                } else {
             qCDebug(LOG_DEVREG).noquote().nospace()
                 << "Device went offline: VID_0x" << QString::number(info.vendorID(), 16) << ":PID_0x" << QString::number(info.productID(), 16);
 
+            // Release the serial port of the unplugged device. Otherwise our own open handle keeps the old
+            // COM port in use and the reconnected device gets "Access denied" on the port.
+            device->rpc()->stopSession();
             device->deviceState()->setOnline(false);
         }
-    }
-}
+
 
 void DeviceRegistry::removeOfflineDevices()
 {
